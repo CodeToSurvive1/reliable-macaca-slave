@@ -23,7 +23,7 @@ function *getDeviceList() {
                         var resolution;
 
                         strText.replace(/Physical size:(.+?)\s+\r?\n/g, function (all, devicesName) {
-                            resolution = devicesName;
+                            resolution = devicesName.toString().trim();
                         });
 
                         arrDeviceList.push({
