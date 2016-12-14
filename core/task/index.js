@@ -32,7 +32,6 @@ module.exports = function *(msg, options) {
   // global.__task_status = status.BUSY;
 
   const channel = Channel.getInstance();
-
   // Change the machine status to busy and notify master
   channel.send({
     type: type.TASK,

@@ -15,6 +15,11 @@ var Channel = require('../slave/channel');
 var logger = require('../../common/logger');
 var getServerInfo = require('../server/monitor');
 
+//测试结果集打包依赖
+var JSZip = require("jszip");
+var request = require('request');
+var zip = new JSZip();
+
 // Set the npm repo
 var npm = new NPM();
 
@@ -38,8 +43,7 @@ var type = {
  * Process the task and send the result back when finished
  * @param msg
  */
-module.exports = function *(msg, options) {
-
+module.exports = co.wrap(function *(msg, options) {
   var channel = Channel.getInstance();
   var basicData = {
     type: type.TASK,
@@ -63,6 +67,9 @@ module.exports = function *(msg, options) {
 
     var logResult = [];
     logger.debug('Task %s start git clone...', msg.taskId);
+
+    console.log(msg);
+
     // Git clone the repo
     var _body = msg.body.trim();
 
@@ -74,7 +81,6 @@ module.exports = function *(msg, options) {
       }),
       _.timeoutPromise(600, 'Git clone timeout for 10mins')
     ]);
-
     gitResult = yield gitRepo.latestCommitInfo();
 
     logger.debug('Task %s start git clone success!', msg.taskId);
@@ -113,10 +119,13 @@ module.exports = function *(msg, options) {
       });
     }
 
+    env['CUSTOM_DIR'] = tempDir+'\\macaca-logs\\macaca-mobile-sample';
     // Run thels test and return a stream.
     var runner = createRunner({
       cwd: tempDir,
       directory: 'macaca-test',
+      reporter:'macaca-simple-reportor',
+      output:tempDir+'\\macaca-logs\\log.html',
       env: env,
       colors: true,
       framework: 'mocha'
@@ -156,7 +165,45 @@ module.exports = function *(msg, options) {
     // Send the final result back with the analysis.
     runner.on('close', function() {
       // Change the status to available after the task.
+      var path = tempDir+'\\macaca-logs\\macaca-mobile-sample\\screenshot';
+      var logData = fs.readFileSync(tempDir+'\\macaca-logs\\macaca-mobile-sample\\result.log','utf-8');
+      var log = zip.folder("macaca-mobile-sample");
+      log.file("result.log", logData);
+      //log.file("result.log", imgData, {base64: true});
 
+      var img = zip.folder("macaca-mobile-sample\\screenshot");
+
+      var imgData;
+       fs.readdir(path, function(err, files){
+      	for(var i=0;i<files.length;i++){
+      		console.log(files[i]);
+      		imgData = fs.readFileSync(path+'\\'+files[i],'base64');
+      		img.file(files[i], imgData, {base64: true});
+      	}
+      	zip
+      	.generateNodeStream({type:'nodebuffer',streamFiles:true})
+      	.pipe(fs.createWriteStream(tempDir+"\\"+msg.taskId+".zip"))
+      	.on('finish', function () {
+      		// JSZip generates a readable stream with a "end" event,
+      		// but is piped here in a writable stream which emits a "finish" event.
+          var resultFile=tempDir+'\\'+msg.taskId+'.zip';
+          var formData = {
+                        // my_field: 'my_value',
+                  my_buffer: new Buffer([1, 2, 3]),
+                  attachments: [
+                  fs.createReadStream(resultFile)
+                    ],
+                };
+
+          request.post({ url: 'http://localhost:3333/api/matc/result', formData: formData }, function optionalCallback(err, httpResponse, body) {
+          if (err) {
+              return console.error('上传结果到业务系统失败:', err,resultFile);
+              }
+             console.log('上传结果到业务系统成功:', resultFile);
+          });
+      		console.log("out.zip written.");
+      	});
+      });
       global.__task_status = status.AVAILABLE;
 
       var execInfo = analysis(finalResult);
@@ -173,8 +220,11 @@ module.exports = function *(msg, options) {
       });
 
       logger.debug('Done task %s data...', msg.taskId);
-
       channel.send(result);
+
+
+
+
     });
 
   } catch (e) {
@@ -217,4 +267,4 @@ module.exports = function *(msg, options) {
       channel.send(data);
     }, 3000);
   }
-};
+});

@@ -31,7 +31,9 @@ _.merge(options, _.getConfig(program));
 module.exports = function() {
   var clusterId = 0;
   var worker = path.join(__dirname, 'worker.js');
-
+  console.log('***************************************');
+  console.log(process.argv);
+  console.log('***************************************');
   cluster.setupMaster({
     exec: worker,
     args: process.argv,
