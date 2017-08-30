@@ -129,7 +129,7 @@ function installMiniCapAndTouch() {
                           if(device.type=='device'){
                             return client.getProperties(device.id)
                                 .then(function (properties) {
-                                
+
                                   try {
                                     var address = getIPAdress();
 
@@ -225,6 +225,10 @@ function installMiniCapAndTouch() {
                                                                 console.log('设备状态改为  1  ');
                                                                 db.collection('devices',function(err,collection){
                                                                 collection.update({serialNumber:allDeviceList[i].serialNumber},{$set:{status:1}},{safe:true},function(err,result){
+
+                                                                });
+                                                                //设备IP切换"slaveId":slaveId[0].toString(),
+                                                                collection.update({serialNumber:allDeviceList[i].serialNumber},{$set:{slaveId:slaveId[0].toString()}},{safe:true},function(err,result){
 
                                                                 });
                                                                 })
